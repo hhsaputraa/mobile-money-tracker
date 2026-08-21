@@ -74,7 +74,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (mounted) {
       setState(() {
         _suggestions = list;
-        if (list.isNotEmpty && _selectedSuggestion == null && !_isCustomUsername) {
+        if (list.isNotEmpty &&
+            _selectedSuggestion == null &&
+            !_isCustomUsername) {
           _selectedSuggestion = list.first;
         }
       });
@@ -128,7 +130,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'September',
       'Oktober',
       'November',
-      'Desember'
+      'Desember',
     ];
     return months[month - 1];
   }
@@ -162,8 +164,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     if (_currentStep < 2) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
       );
       setState(() {
         _currentStep++;
@@ -179,8 +181,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _currentStep--;
       });
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.fastOutSlowIn,
       );
     }
   }
@@ -292,8 +294,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         elevation: 0,
         leading: _currentStep > 0
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded,
-                    color: Color(0xFF0F172A)),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Color(0xFF0F172A),
+                ),
                 onPressed: _goToPreviousStep,
               )
             : null,
@@ -339,9 +343,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildStep1DataDiri(user?.fullName),
-                  _buildStep2PilihUsername(),
-                  _buildStep3PasswordBaru(),
+                  RepaintBoundary(child: _buildStep1DataDiri(user?.fullName)),
+                  RepaintBoundary(child: _buildStep2PilihUsername()),
+                  RepaintBoundary(child: _buildStep3PasswordBaru()),
                 ],
               ),
             ),
@@ -428,8 +432,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 hintText: 'Jl. Contoh No. 123, Kota...',
-                hintStyle:
-                    const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                hintStyle: const TextStyle(
+                  color: Color(0xFF9CA3AF),
+                  fontSize: 14,
+                ),
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.all(16),
@@ -465,9 +471,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Lanjutkan ke Username',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      'Selanjutnya',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     SizedBox(width: 8),
                     Icon(Icons.arrow_forward_rounded, size: 18),
@@ -499,7 +507,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Pilih salah satu saran nama pengguna yang tersedia atau buat nama pengguna unik Anda sendiri.',
+            'Pilih atau buat username',
             style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 24),
@@ -527,25 +535,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: isSelected ? 1.8 : 1.0,
                 ),
               ),
-              child: RadioListTile<String>(
-                value: suggestion,
-                groupValue: _isCustomUsername ? null : _selectedSuggestion,
-                activeColor: AppTheme.primaryColor,
-                title: Text(
-                  suggestion,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: const Color(0xFF0F172A),
-                  ),
-                ),
-                onChanged: (val) {
+              child: InkWell(
+                onTap: () {
                   setState(() {
                     _isCustomUsername = false;
-                    _selectedSuggestion = val;
+                    _selectedSuggestion = suggestion;
                   });
                 },
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: isSelected
+                            ? AppTheme.primaryColor
+                            : const Color(0xFF94A3B8),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          suggestion,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           }),
@@ -566,23 +595,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: Column(
               children: [
-                RadioListTile<bool>(
-                  value: true,
-                  groupValue: _isCustomUsername,
-                  activeColor: AppTheme.primaryColor,
-                  title: const Text(
-                    'Buat username sendiri...',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  onChanged: (val) {
+                InkWell(
+                  onTap: () {
                     setState(() {
                       _isCustomUsername = true;
                     });
                   },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isCustomUsername
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: _isCustomUsername
+                              ? AppTheme.primaryColor
+                              : const Color(0xFF94A3B8),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Buat username...',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 if (_isCustomUsername)
                   Padding(
@@ -591,7 +640,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       controller: _customUsernameController,
                       textInputAction: TextInputAction.done,
                       decoration: _buildDecoration(
-                        hintText: 'Ketik username yang diinginkan',
+                        hintText: 'Ketik username',
                         prefixIcon: Icons.alternate_email_rounded,
                       ),
                     ),
@@ -618,9 +667,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Lanjutkan ke Kata Sandi',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    'Selanjutnya',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   SizedBox(width: 8),
                   Icon(Icons.arrow_forward_rounded, size: 18),
@@ -653,7 +701,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Buat kata sandi yang kuat dengan minimal 6 karakter untuk mengamankan akun Anda.',
+              'Buat kata sandi yang kuat dengan minimal 6 karakter.',
               style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 24),
@@ -710,7 +758,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
             // Input Konfirmasi Password
             const Text(
-              'Konfirmasi Kata Sandi Baru',
+              'Konfirmasi Kata Sandi',
               style: TextStyle(
                 color: Color(0xFF334155),
                 fontSize: 13,
@@ -725,7 +773,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               enabled: !_isLoading,
               onFieldSubmitted: (_) => _submitOnboarding(),
               decoration: _buildDecoration(
-                hintText: 'Ulangi kata sandi baru',
+                hintText: 'Ulangi kata sandi',
                 prefixIcon: Icons.lock_outline_rounded,
                 suffixIcon: IconButton(
                   icon: Icon(

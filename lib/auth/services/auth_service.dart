@@ -193,15 +193,16 @@ class AuthService {
       rawCandidates.add('${name}88');
     }
 
-    final List<String> availableSuggestions = [];
-    for (final candidate in rawCandidates) {
-      final isFree = await checkUsernameAvailable(candidate);
-      if (isFree) {
-        availableSuggestions.add(candidate);
-      } else {
-        availableSuggestions.add('${candidate}_${DateTime.now().millisecond % 100}');
-      }
-    }
+    final availableSuggestions = await Future.wait(
+      rawCandidates.map((candidate) async {
+        final isFree = await checkUsernameAvailable(candidate);
+        if (isFree) {
+          return candidate;
+        } else {
+          return '${candidate}_${DateTime.now().millisecond % 100}';
+        }
+      }),
+    );
 
     return availableSuggestions.take(3).toList();
   }

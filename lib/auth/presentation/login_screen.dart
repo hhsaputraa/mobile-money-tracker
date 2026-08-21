@@ -5,7 +5,6 @@ import '../../dashboard/presentation/dashboard_screen.dart';
 import '../services/auth_service.dart';
 import 'onboarding_screen.dart';
 
-/// Halaman Login utama untuk Money Tracker / Arus Kas
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -46,10 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final input = _usernameOrEmailController.text.trim();
     final password = _passwordController.text.trim();
 
-    final result = await _authService.login(
-      email: input,
-      password: password,
-    );
+    final result = await _authService.login(email: input, password: password);
 
     if (!mounted) return;
 
@@ -435,37 +431,55 @@ class _LoginFooter extends StatelessWidget {
   }
 }
 
-/// Widget background gambar terisolasi dengan RepaintBoundary & Overlay tipis
+/// Widget background ultra-ringan terisolasi dengan CustomPainter (ramah hp spek kentang, 0 request network, 0 alokasi memori gambar)
 class _LoginBackground extends StatelessWidget {
   const _LoginBackground();
 
-  static const String _imageUrl =
-      'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1080&q=80';
-
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.network(
-            _imageUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                const SizedBox.expand(),
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              if (wasSynchronouslyLoaded) return child;
-              return AnimatedOpacity(
-                opacity: frame == null ? 0 : 1,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-                child: child,
-              );
-            },
-          ),
-          Container(color: Colors.white.withValues(alpha: 0.93)),
-        ],
+    return const RepaintBoundary(
+      child: CustomPaint(
+        painter: _BackgroundPainter(),
+        child: SizedBox.expand(),
       ),
     );
   }
+}
+
+class _BackgroundPainter extends CustomPainter {
+  const _BackgroundPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Colors.white,
+        const Color(0xFFF8FAFC),
+        AppTheme.primaryColor.withValues(alpha: 0.03),
+      ],
+      stops: const [0.0, 0.7, 1.0],
+    );
+    canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
+
+    final circlePaint = Paint()
+      ..color = AppTheme.primaryColor.withValues(alpha: 0.025)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(
+      Offset(size.width * 0.9, size.height * 0.12),
+      size.width * 0.35,
+      circlePaint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.1, size.height * 0.85),
+      size.width * 0.45,
+      circlePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

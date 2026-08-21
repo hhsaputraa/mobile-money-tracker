@@ -13,7 +13,7 @@ void main() async {
 
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
+    publishableKey: AppConstants.supabaseAnonKey,
   );
 
   runApp(const MoneyTrackerApp());

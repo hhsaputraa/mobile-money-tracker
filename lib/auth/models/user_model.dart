@@ -28,14 +28,17 @@ class UserModel {
   /// Factory untuk membuat UserModel dari objek User bawaan Supabase
   factory UserModel.fromSupabaseUser(User user) {
     final metadata = user.userMetadata ?? {};
-    final fullName = metadata['full_name']?.toString() ??
+    final fullName =
+        metadata['full_name']?.toString() ??
         metadata['name']?.toString() ??
         user.email?.split('@').first ??
         'User';
-    final username = metadata['username']?.toString() ??
+    final username =
+        metadata['username']?.toString() ??
         user.email?.split('@').first ??
         'user';
-    final isAdmin = metadata['is_admin'] == true ||
+    final isAdmin =
+        metadata['is_admin'] == true ||
         metadata['role']?.toString().toLowerCase() == 'admin';
 
     DateTime? parsedBirthDate;
@@ -45,7 +48,6 @@ class UserModel {
       } catch (_) {}
     }
 
-    // Cek apakah user wajib menyelesaikan onboarding/ganti password di login pertama
     final isPasswordChanged = metadata['password_changed'] == true;
     final isExplicitlyExempt = metadata['must_change_password'] == false;
     final mustChange = !isPasswordChanged && !isExplicitlyExempt;
@@ -67,7 +69,8 @@ class UserModel {
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final isPasswordChanged = json['password_changed'] == true;
     final isExplicitlyExempt = json['must_change_password'] == false;
-    final mustChange = json['must_change_password'] == true ||
+    final mustChange =
+        json['must_change_password'] == true ||
         (!isPasswordChanged && !isExplicitlyExempt);
 
     DateTime? parsedBirthDate;
