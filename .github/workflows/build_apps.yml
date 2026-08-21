@@ -3,10 +3,9 @@ name: Build Android APK & iOS IPA
 on:
   push:
     branches: [ main, master, dev ]
-  workflow_dispatch: # Memungkinkan tombol "Run workflow" manual di tab GitHub Actions
+  workflow_dispatch:
 
 env:
-  # Menghilangkan warning deprecation Node.js 20 yang dipaksa ke Node.js 24
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
 
 jobs:

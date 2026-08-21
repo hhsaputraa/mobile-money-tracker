@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../auth/models/user_model.dart';
-import '../../auth/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../services/user_management_service.dart';
 import 'create_user_dialog.dart';
 
 /// Halaman Manajemen Pengguna khusus Administrator
@@ -16,7 +16,7 @@ class UserManagementScreen extends StatefulWidget {
 }
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
-  final AuthService _authService = AuthService();
+  final UserManagementService _userManagementService = UserManagementService();
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
@@ -52,7 +52,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       _isLoading = true;
     });
 
-    final users = await _authService.fetchUsersList();
+    final users = await _userManagementService.fetchUsersList();
 
     if (mounted) {
       setState(() {

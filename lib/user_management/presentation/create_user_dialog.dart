@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../auth/models/user_model.dart';
-import '../../auth/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../services/user_management_service.dart';
 
 /// Dialog Form untuk Admin membuat akun user baru
 class CreateUserDialog extends StatefulWidget {
@@ -15,7 +15,7 @@ class CreateUserDialog extends StatefulWidget {
 
 class _CreateUserDialogState extends State<CreateUserDialog> {
   final _formKey = GlobalKey<FormState>();
-  final AuthService _authService = AuthService();
+  final UserManagementService _userManagementService = UserManagementService();
 
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -54,7 +54,7 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
     });
 
     final password = _passwordController.text.trim();
-    final result = await _authService.adminCreateUser(
+    final result = await _userManagementService.adminCreateUser(
       fullName: _fullNameController.text.trim(),
       email: _emailController.text.trim(),
       password: password,

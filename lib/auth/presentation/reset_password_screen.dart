@@ -100,10 +100,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFF9CA3AF),
-        fontSize: 14,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
       prefixIcon: Icon(prefixIcon, size: 20, color: const Color(0xFF64748B)),
       suffixIcon: suffixIcon,
       filled: true,
@@ -160,7 +157,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Halo ${user?.fullName ?? user?.username ?? 'User'}, ini adalah pertama kali Anda login. Silakan buat password baru yang Anda inginkan.',
+                    'Halo ${user?.fullName ?? user?.username ?? 'User'}, ini adalah pertama kali Anda login. Silakan buat password baru.',
                     style: const TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 14,
