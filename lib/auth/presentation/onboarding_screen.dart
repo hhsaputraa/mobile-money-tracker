@@ -160,6 +160,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         });
         return;
       }
+
+      if (_isCustomUsername) {
+        final validRegex = RegExp(r'^[a-zA-Z0-9._]{3,30}$');
+        if (!validRegex.hasMatch(chosen)) {
+          setState(() {
+            _errorMessage =
+                'Username hanya boleh berisi huruf, angka, titik, atau garis bawah (3-30 karakter).';
+          });
+          return;
+        }
+      }
     }
 
     if (_currentStep < 2) {

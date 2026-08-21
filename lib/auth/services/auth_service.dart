@@ -36,11 +36,11 @@ class AuthService {
   /// Inisialisasi listener auth state change dari Supabase
   void _initAuthListener() {
     try {
-      _client?.auth.onAuthStateChange.listen((data) {
+      _client?.auth.onAuthStateChange.listen((data) async {
         final session = data.session;
         if (session != null) {
           currentToken.value = session.accessToken;
-          currentUser.value = UserModel.fromSupabaseUser(session.user);
+          currentUser.value = await _enrichUserModelWithProfile(session.user);
         } else {
           currentToken.value = null;
           currentUser.value = null;
@@ -60,7 +60,7 @@ class AuthService {
       final session = client?.auth.currentSession;
       if (session != null && !session.isExpired) {
         currentToken.value = session.accessToken;
-        currentUser.value = UserModel.fromSupabaseUser(session.user);
+        currentUser.value = await _enrichUserModelWithProfile(session.user);
       } else {
         currentToken.value = null;
         currentUser.value = null;
@@ -71,6 +71,55 @@ class AuthService {
     } finally {
       isCheckingAuth.value = false;
     }
+  }
+
+  /// Memperkaya data user dengan mengambil status is_admin & profil dari tabel profiles
+  Future<UserModel> _enrichUserModelWithProfile(User user) async {
+    UserModel userModel = UserModel.fromSupabaseUser(user);
+    final client = _client;
+    if (client == null) return userModel;
+
+    try {
+      final profile = await client
+          .from('profiles')
+          .select('is_admin, full_name, username, address, birth_date')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (profile != null) {
+        final isAdminProfile = profile['is_admin'] == true ||
+            profile['is_admin']?.toString().toLowerCase() == 'true';
+        final fullNameProfile = profile['full_name']?.toString();
+        final usernameProfile = profile['username']?.toString();
+        final addressProfile = profile['address']?.toString();
+
+        DateTime? birthDateProfile;
+        if (profile['birth_date'] != null) {
+          try {
+            birthDateProfile = DateTime.parse(profile['birth_date'].toString());
+          } catch (_) {}
+        }
+
+        userModel = UserModel(
+          id: user.id,
+          username: (usernameProfile != null && usernameProfile.isNotEmpty)
+              ? usernameProfile
+              : userModel.username,
+          fullName: (fullNameProfile != null && fullNameProfile.isNotEmpty)
+              ? fullNameProfile
+              : userModel.fullName,
+          email: user.email ?? '',
+          address: addressProfile ?? userModel.address,
+          birthDate: birthDateProfile ?? userModel.birthDate,
+          isAdmin: isAdminProfile || userModel.isAdmin,
+          isActive: true,
+          mustChangePassword: userModel.mustChangePassword,
+          lastLoginAt: user.lastSignInAt,
+        );
+      }
+    } catch (_) {}
+
+    return userModel;
   }
 
   /// Melakukan login via Supabase Auth dengan username atau email & password
@@ -119,7 +168,7 @@ class AuthService {
 
       final user = response.user;
       if (user != null) {
-        final userModel = UserModel.fromSupabaseUser(user);
+        final userModel = await _enrichUserModelWithProfile(user);
         currentUser.value = userModel;
         currentToken.value = response.session?.accessToken;
 
@@ -136,6 +185,7 @@ class AuthService {
       return AuthResult.failure('Terjadi kendala saat login: $e');
     }
   }
+
 
   /// Mengecek ketersediaan username di tabel profiles
   Future<bool> checkUsernameAvailable(String username) async {
@@ -220,6 +270,13 @@ class AuthService {
 
     if (cleanUsername.isEmpty || cleanAddress.isEmpty || cleanPassword.isEmpty) {
       return AuthResult.failure('Semua data onboarding wajib diisi.');
+    }
+
+    final validUsernameRegex = RegExp(r'^[a-zA-Z0-9._]{3,30}$');
+    if (!validUsernameRegex.hasMatch(cleanUsername)) {
+      return AuthResult.failure(
+        'Username hanya boleh berisi huruf, angka, titik, atau garis bawah (3-30 karakter).',
+      );
     }
 
     if (cleanPassword.length < 6) {
@@ -329,6 +386,81 @@ class AuthService {
     }
   }
 
+  /// Mengambil daftar semua user terdaftar dari tabel profiles (khusus Admin)
+  Future<List<UserModel>> fetchUsersList() async {
+    final client = _client;
+    if (client == null) return [];
+
+    try {
+      final List<dynamic> response = await client
+          .from('profiles')
+          .select('id, username, full_name, email, is_admin, must_change_password, is_onboarded, created_at')
+          .order('created_at', ascending: false);
+
+      return response
+          .map((json) => UserModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Membuat user baru oleh Admin via Supabase RPC tanpa memutuskan sesi login Admin
+  Future<AuthResult> adminCreateUser({
+    required String email,
+    required String password,
+    required String fullName,
+    bool isAdmin = false,
+  }) async {
+    final cleanEmail = email.trim();
+    final cleanPassword = password.trim();
+    final cleanFullName = fullName.trim();
+
+    if (cleanEmail.isEmpty || cleanPassword.isEmpty || cleanFullName.isEmpty) {
+      return AuthResult.failure('Nama, email/username, dan password wajib diisi.');
+    }
+
+    if (cleanPassword.length < 6) {
+      return AuthResult.failure('Password minimal 6 karakter.');
+    }
+
+    final client = _client;
+    if (client == null) {
+      return AuthResult.failure('Supabase belum diinisialisasi.');
+    }
+
+    try {
+      final response = await client.rpc(
+        'admin_create_user',
+        params: {
+          'new_email': cleanEmail,
+          'new_password': cleanPassword,
+          'new_full_name': cleanFullName,
+          'is_admin_flag': isAdmin,
+        },
+      );
+
+      final userMap = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+      final createdUser = UserModel(
+        id: userMap['id']?.toString() ?? '',
+        username: userMap['username']?.toString() ?? cleanEmail.split('@').first,
+        fullName: cleanFullName,
+        email: userMap['email']?.toString() ?? cleanEmail,
+        isAdmin: isAdmin,
+        mustChangePassword: true,
+      );
+
+      return AuthResult.success(
+        message: 'Pengguna baru berhasil dibuat!',
+        user: createdUser,
+      );
+    } on PostgrestException catch (e) {
+      return AuthResult.failure(e.message);
+    } catch (e) {
+      return AuthResult.failure('Gagal membuat pengguna: $e');
+    }
+  }
+
   /// Logout dari Supabase
   Future<void> logout() async {
     try {
@@ -357,3 +489,4 @@ class AuthService {
     return message;
   }
 }
+

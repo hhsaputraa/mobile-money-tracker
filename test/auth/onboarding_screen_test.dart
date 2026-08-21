@@ -17,10 +17,10 @@ void main() {
     expect(find.text('Lengkapi Data Diri'), findsOneWidget);
     expect(find.text('Tanggal Lahir'), findsOneWidget);
     expect(find.text('Alamat Tempat Tinggal'), findsOneWidget);
-    expect(find.text('Lanjutkan ke Username'), findsOneWidget);
+    expect(find.text('Selanjutnya'), findsOneWidget);
 
     // Tap next without filling
-    final nextButton = find.text('Lanjutkan ke Username');
+    final nextButton = find.text('Selanjutnya');
     await tester.tap(nextButton);
     await tester.pumpAndSettle();
 
