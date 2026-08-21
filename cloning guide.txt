@@ -1,0 +1,53 @@
+Langkah 1: Copy Folder & Bersihkan Cache
+Copy seluruh folder d:\app\ai\dashboard ke folder baru (misalnya d:\app\ai\client-baru-app).
+Buka terminal di folder baru tersebut, lalu hapus cache lama:
+powershell
+# Hapus git lama dan build cache
+Remove-Item -Recurse -Force .git, build, .dart_tool
+
+Langkah 2: Ganti Nama Project di pubspec.yaml
+Buka pubspec.yaml:
+
+yaml
+name: client_baru_app # Gunakan huruf kecil & underscore
+description: "Sistem Informasi & Dashboard Client Baru."
+Lalu jalankan di terminal:
+
+powershell
+flutter pub get
+
+Langkah 3: Ganti Identitas Perusahaan & Warna Brand (Hanya di 2 File)
+Nama Perusahaan & Kunci (
+
+lib/core/constants/app_constants.dart
+):
+dart
+static const String appName = 'PT CLIENT BARU SISTEM';
+Warna Identitas Brand (
+
+lib/core/theme/app_theme.dart
+): (Tinggal ganti hex color sesuai logo perusahaan baru, misal Biru Color(0xFF2563EB) atau Hijau Color(0xFF16A34A)):
+dart
+static const Color primaryColor = Color(0xFF2563EB); // Warna Brand Baru
+
+Langkah 4: Ganti Nama Aplikasi & Package ID (Android & iOS)
+Agar saat diinstal di HP tidak bentrok dengan aplikasi lama:
+
+A. Untuk Android:
+Ganti Application ID & Namespace di android/app/build.gradle.kts:
+kotlin
+namespace = "com.clientbaru.app"
+defaultConfig {
+    applicationId = "com.clientbaru.app"
+    ...
+}
+Ganti Nama Label Aplikasi di HP di android/app/src/main/AndroidManifest.xml:
+xml
+<application
+    android:label="Client Baru App"
+    ...
+B. Untuk iOS:
+Buka ios/Runner/Info.plist, ubah nama tampilan:
+xml
+<key>CFBundleDisplayName</key>
+<string>Client Baru</string>

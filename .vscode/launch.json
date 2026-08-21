@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Dashboard (Edge Web)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "edge",
+      "args": [
+        "--dart-define-from-file=.env.json"
+      ]
+    },
+    {
+      "name": "Dashboard (Windows Desktop)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "windows",
+      "args": [
+        "--dart-define-from-file=.env.json"
+      ]
+    }
+  ]
+}
