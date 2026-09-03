@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../services/auth_service.dart';
+import 'forgot_password_screen.dart';
 import 'onboarding_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -54,15 +55,18 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (result.isSuccess) {
-      final mustChange = result.user?.mustChangePassword ?? false;
+      final user = result.user;
+      final isUserAdmin = user?.isAdmin ?? false;
+      final mustChange = (user?.mustChangePassword ?? false) && !isUserAdmin;
+
       if (mustChange) {
-        // Alihkan ke layar Onboarding Setup Akun (Data Diri, Pilih Username, Reset Password)
+        // User baru login pertama kali: Alihkan ke layar Onboarding Setup Akun (Data Diri, Username, Password Baru)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OnboardingScreen()),
         );
       } else {
-        // Langsung masuk ke Dashboard
+        // Pengguna lama yang sudah setup atau Admin: Langsung masuk ke Dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
@@ -282,7 +286,44 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 10),
+
+                            // Link Lupa Password
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const ForgotPasswordScreen(),
+                                          ),
+                                        );
+                                      },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryColor,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'Lupa Password?',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
 
                             // Tombol Masuk
                             SizedBox(

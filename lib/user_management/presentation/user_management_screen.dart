@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../auth/models/user_model.dart';
+import '../../auth/services/auth_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../services/user_management_service.dart';
 import 'create_user_dialog.dart';
+import 'reset_user_password_dialog.dart';
 
 /// Halaman Manajemen Pengguna khusus Administrator
 class UserManagementScreen extends StatefulWidget {
@@ -90,6 +92,134 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     if (result == true) {
       _loadUsers();
+    }
+  }
+
+  Future<void> _openResetUserPasswordDialog(UserModel user) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => ResetUserPasswordDialog(user: user),
+    );
+
+    if (result == true) {
+      _loadUsers();
+    }
+  }
+
+  Future<void> _confirmDeleteUser(UserModel user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFEE2E2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFDC2626),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Hapus Pengguna?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus akun "${user.fullName.isNotEmpty ? user.fullName : user.username}"? Pengguna ini tidak akan dapat login kembali.',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF475569),
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Hapus',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final displayName =
+        user.fullName.isNotEmpty ? user.fullName : user.username;
+
+    // Tampilkan loading snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Sedang menghapus pengguna...'),
+          ],
+        ),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
+    final result = await _userManagementService.adminDeleteUser(user.id);
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      setState(() {
+        _allUsers.removeWhere((u) => u.id == user.id);
+        _filteredUsers.removeWhere((u) => u.id == user.id);
+      });
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Pengguna "$displayName" berhasil dihapus.'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
     }
   }
 
@@ -206,7 +336,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           itemCount: _filteredUsers.length,
                           itemBuilder: (context, index) {
                             final user = _filteredUsers[index];
-                            return _UserCardTile(key: ValueKey(user.id), user: user);
+                            final currentUserId =
+                                AuthService().currentUser.value?.id;
+                            final isSelf =
+                                currentUserId != null && currentUserId == user.id;
+
+                            return _UserCardTile(
+                              key: ValueKey(user.id),
+                              user: user,
+                              isSelf: isSelf,
+                              onResetPassword: () =>
+                                  _openResetUserPasswordDialog(user),
+                              onDelete:
+                                  isSelf ? null : () => _confirmDeleteUser(user),
+                            );
                           },
                         ),
                       ),
@@ -270,8 +413,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 /// Widget kartu user terisolasi dengan RepaintBoundary agar scroll 60 FPS mulus di HP kentang
 class _UserCardTile extends StatelessWidget {
   final UserModel user;
+  final bool isSelf;
+  final VoidCallback onResetPassword;
+  final VoidCallback? onDelete;
 
-  const _UserCardTile({super.key, required this.user});
+  const _UserCardTile({
+    super.key,
+    required this.user,
+    this.isSelf = false,
+    required this.onResetPassword,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -376,6 +528,24 @@ class _UserCardTile extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.key_rounded, size: 20),
+                tooltip: 'Reset Password',
+                color: const Color(0xFFD97706),
+                onPressed: onResetPassword,
+              ),
+              if (!isSelf && onDelete != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  tooltip: 'Hapus Pengguna',
+                  color: const Color(0xFFDC2626),
+                  onPressed: onDelete,
+                ),
+            ],
           ),
         ),
       ),

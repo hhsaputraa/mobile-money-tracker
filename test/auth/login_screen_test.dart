@@ -27,6 +27,22 @@ void main() {
     expect(find.text('Username atau email tidak boleh kosong'), findsOneWidget);
     expect(find.text('Password tidak boleh kosong'), findsOneWidget);
   });
+
+  testWidgets('LoginScreen shows Lupa Password? button and navigates', (WidgetTester tester) async {
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
+
+    final forgotPasswordBtn = find.text('Lupa Password?');
+    expect(forgotPasswordBtn, findsOneWidget);
+
+    await tester.tap(forgotPasswordBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lupa Password?'), findsOneWidget);
+    expect(find.text('Kode Unik dari Admin'), findsOneWidget);
+    expect(
+        find.widgetWithText(ElevatedButton, 'Verifikasi Kode'), findsOneWidget);
+  });
 }
 
 

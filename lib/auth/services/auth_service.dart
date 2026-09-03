@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/auth_result.dart';
 import '../models/user_model.dart';
 import '../../user_management/services/user_management_service.dart';
@@ -40,8 +42,15 @@ class AuthService {
       _client?.auth.onAuthStateChange.listen((data) async {
         final session = data.session;
         if (session != null) {
-          currentToken.value = session.accessToken;
-          currentUser.value = await _enrichUserModelWithProfile(session.user);
+          final enriched = await _enrichUserModelWithProfile(session.user);
+          if (!enriched.isActive) {
+            await _client?.auth.signOut();
+            currentToken.value = null;
+            currentUser.value = null;
+          } else {
+            currentToken.value = session.accessToken;
+            currentUser.value = enriched;
+          }
         } else {
           currentToken.value = null;
           currentUser.value = null;
@@ -60,8 +69,15 @@ class AuthService {
       final client = _client;
       final session = client?.auth.currentSession;
       if (session != null && !session.isExpired) {
-        currentToken.value = session.accessToken;
-        currentUser.value = await _enrichUserModelWithProfile(session.user);
+        final enriched = await _enrichUserModelWithProfile(session.user);
+        if (!enriched.isActive) {
+          await client?.auth.signOut();
+          currentToken.value = null;
+          currentUser.value = null;
+        } else {
+          currentToken.value = session.accessToken;
+          currentUser.value = enriched;
+        }
       } else {
         currentToken.value = null;
         currentUser.value = null;
@@ -83,16 +99,23 @@ class AuthService {
     try {
       final profile = await client
           .from('profiles')
-          .select('is_admin, full_name, username, address, birth_date')
+          .select(
+              'is_admin, full_name, username, address, birth_date, must_change_password, reset_code, is_active')
           .eq('id', user.id)
           .maybeSingle();
 
       if (profile != null) {
-        final isAdminProfile = profile['is_admin'] == true ||
+        final isAdminProfile =
+            profile['is_admin'] == true ||
             profile['is_admin']?.toString().toLowerCase() == 'true';
         final fullNameProfile = profile['full_name']?.toString();
         final usernameProfile = profile['username']?.toString();
         final addressProfile = profile['address']?.toString();
+        final isActiveProfile = profile['is_active'] == null
+            ? true
+            : (profile['is_active'] == true ||
+                profile['is_active'] == 1 ||
+                profile['is_active']?.toString().toLowerCase() == 'true');
 
         DateTime? birthDateProfile;
         if (profile['birth_date'] != null) {
@@ -100,6 +123,9 @@ class AuthService {
             birthDateProfile = DateTime.parse(profile['birth_date'].toString());
           } catch (_) {}
         }
+
+        final isUserAdmin = isAdminProfile || userModel.isAdmin;
+        final mustChangeProfile = !isUserAdmin && userModel.mustChangePassword;
 
         userModel = UserModel(
           id: user.id,
@@ -112,9 +138,9 @@ class AuthService {
           email: user.email ?? '',
           address: addressProfile ?? userModel.address,
           birthDate: birthDateProfile ?? userModel.birthDate,
-          isAdmin: isAdminProfile || userModel.isAdmin,
-          isActive: true,
-          mustChangePassword: userModel.mustChangePassword,
+          isAdmin: isUserAdmin,
+          isActive: isActiveProfile,
+          mustChangePassword: mustChangeProfile,
           lastLoginAt: user.lastSignInAt,
         );
       }
@@ -147,17 +173,34 @@ class AuthService {
       try {
         final profile = await client
             .from('profiles')
-            .select('email')
+            .select('email, is_active')
             .eq('username', cleanInput.toLowerCase())
             .maybeSingle();
 
-        if (profile != null && profile['email'] != null) {
-          authEmail = profile['email'].toString();
+        if (profile != null) {
+          final isProfileActive = profile['is_active'] == null
+              ? true
+              : (profile['is_active'] == true ||
+                  profile['is_active'] == 1 ||
+                  profile['is_active']?.toString().toLowerCase() == 'true');
+
+          // Jika user dinonaktifkan/dihapus, samakan error dengan username/password salah
+          if (!isProfileActive) {
+            return AuthResult.failure(
+              'Username/Email atau password salah. Silakan periksa kembali.',
+            );
+          }
+
+          if (profile['email'] != null) {
+            authEmail = profile['email'].toString();
+          } else {
+            authEmail = '$cleanInput@hhsaputra.my.id';
+          }
         } else {
-          authEmail = '$cleanInput@moneytracker.app';
+          authEmail = '$cleanInput@hhsaputra.my.id';
         }
       } catch (_) {
-        authEmail = '$cleanInput@moneytracker.app';
+        authEmail = '$cleanInput@hhsaputra.my.id';
       }
     }
 
@@ -170,13 +213,21 @@ class AuthService {
       final user = response.user;
       if (user != null) {
         final userModel = await _enrichUserModelWithProfile(user);
+
+        // Jika user nonaktif (soft deleted), batalkan sesi dan tolak login
+        if (!userModel.isActive) {
+          await client.auth.signOut();
+          currentUser.value = null;
+          currentToken.value = null;
+          return AuthResult.failure(
+            'Username/Email atau password salah. Silakan periksa kembali.',
+          );
+        }
+
         currentUser.value = userModel;
         currentToken.value = response.session?.accessToken;
 
-        return AuthResult.success(
-          message: 'Login berhasil.',
-          user: userModel,
-        );
+        return AuthResult.success(message: 'Login berhasil.', user: userModel);
       }
 
       return AuthResult.failure('Login gagal. Pengguna tidak ditemukan.');
@@ -186,7 +237,6 @@ class AuthService {
       return AuthResult.failure('Terjadi kendala saat login: $e');
     }
   }
-
 
   /// Mengecek ketersediaan username di tabel profiles
   Future<bool> checkUsernameAvailable(String username) async {
@@ -198,10 +248,7 @@ class AuthService {
 
     try {
       final currentUserId = client.auth.currentUser?.id;
-      final query = client
-          .from('profiles')
-          .select('id')
-          .eq('username', clean);
+      final query = client.from('profiles').select('id').eq('username', clean);
 
       final List<dynamic> records = await query;
       if (records.isEmpty) return true;
@@ -222,10 +269,10 @@ class AuthService {
     required String baseName,
     DateTime? birthDate,
   }) async {
-    final cleanBase = baseName
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final cleanBase = baseName.trim().toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
     final name = cleanBase.isEmpty ? 'user' : cleanBase;
 
     final List<String> rawCandidates = [];
@@ -235,9 +282,9 @@ class AuthService {
       final day = birthDate.day.toString().padLeft(2, '0');
       final month = birthDate.month.toString().padLeft(2, '0');
 
-      rawCandidates.add('$name$yearShort');     // contoh: budi98
-      rawCandidates.add('$name$day$month');      // contoh: budi1505
-      rawCandidates.add('${name}_id');          // contoh: budi_id
+      rawCandidates.add('$name$yearShort'); // contoh: budi98
+      rawCandidates.add('$name$day$month'); // contoh: budi1505
+      rawCandidates.add('${name}_id'); // contoh: budi_id
     } else {
       rawCandidates.add('$name.kas');
       rawCandidates.add('${name}_id');
@@ -269,7 +316,9 @@ class AuthService {
     final cleanAddress = address.trim();
     final cleanPassword = newPassword.trim();
 
-    if (cleanUsername.isEmpty || cleanAddress.isEmpty || cleanPassword.isEmpty) {
+    if (cleanUsername.isEmpty ||
+        cleanAddress.isEmpty ||
+        cleanPassword.isEmpty) {
       return AuthResult.failure('Semua data onboarding wajib diisi.');
     }
 
@@ -292,7 +341,9 @@ class AuthService {
     // 1. Cek ketersediaan username
     final isAvailable = await checkUsernameAvailable(cleanUsername);
     if (!isAvailable) {
-      return AuthResult.failure('Username "$cleanUsername" sudah digunakan. Silakan pilih yang lain.');
+      return AuthResult.failure(
+        'Username "$cleanUsername" sudah digunakan. Silakan pilih yang lain.',
+      );
     }
 
     try {
@@ -363,6 +414,7 @@ class AuthService {
           password: cleanPassword,
           data: {
             'must_change_password': false,
+            'reset_by_admin': false,
             'password_changed': true,
             'is_first_login': false,
           },
@@ -371,6 +423,13 @@ class AuthService {
 
       final user = response.user;
       if (user != null) {
+        try {
+          await client.from('profiles').update({
+            'must_change_password': false,
+            'password_changed': true,
+          }).eq('id', user.id);
+        } catch (_) {}
+
         final userModel = UserModel.fromSupabaseUser(user);
         currentUser.value = userModel;
         return AuthResult.success(
@@ -384,6 +443,135 @@ class AuthService {
       return AuthResult.failure(_mapAuthErrorMessage(e.message));
     } catch (e) {
       return AuthResult.failure('Terjadi kendala saat update password: $e');
+    }
+  }
+
+  /// Mereset password user melalui verifikasi dan pencocokan password sementara yang diberikan Admin
+  Future<AuthResult> resetPasswordWithAdminPassword({
+    required String usernameOrEmail,
+    required String adminPassword,
+    required String newPassword,
+  }) async {
+    final cleanInput = usernameOrEmail.trim();
+    final cleanAdminPassword = adminPassword.trim();
+    final cleanNewPassword = newPassword.trim();
+
+    if (cleanInput.isEmpty || cleanAdminPassword.isEmpty || cleanNewPassword.isEmpty) {
+      return AuthResult.failure('Semua kolom wajib diisi.');
+    }
+
+    if (cleanNewPassword.length < 6) {
+      return AuthResult.failure('Password baru minimal 6 karakter.');
+    }
+
+    if (cleanAdminPassword == cleanNewPassword) {
+      return AuthResult.failure(
+        'Password baru tidak boleh sama dengan password dari admin.',
+      );
+    }
+
+    // 1. Verifikasi kecocokan: login ke Supabase dengan email/username dan password sementara dari admin
+    final loginResult = await login(
+      email: cleanInput,
+      password: cleanAdminPassword,
+    );
+
+    if (!loginResult.isSuccess) {
+      return AuthResult.failure(
+        'Password dari admin tidak cocok atau akun tidak ditemukan. Silakan hubungi admin Anda untuk mendapatkan password sementara yang sesuai.',
+      );
+    }
+
+    // 2. Karena kredensial password dari admin cocok dan valid, update ke password baru
+    final updateResult = await updatePassword(newPassword: cleanNewPassword);
+    if (!updateResult.isSuccess) {
+      return updateResult;
+    }
+
+    // 3. Logout agar sesi sementara dibersihkan dan pengguna dapat login dengan password baru
+    await logout();
+
+    return AuthResult.success(
+      message: 'Password berhasil diperbarui! Silakan masuk dengan password baru Anda.',
+    );
+  }
+
+  /// Memvalidasi kode unik 6-digit dari Admin (Tahap 1 Lupa Password)
+  Future<AuthResult> verifyResetCode(String code) async {
+    final cleanCode = code.trim().toUpperCase();
+    if (cleanCode.length < 4) {
+      return AuthResult.failure('Kode unik tidak valid.');
+    }
+
+    final client = _client;
+    if (client == null) {
+      return AuthResult.failure('Supabase belum diinisialisasi.');
+    }
+
+    try {
+      final response = await client.rpc(
+        'verify_reset_code',
+        params: {'input_code': cleanCode},
+      );
+
+      final data =
+          response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+      final user = UserModel(
+        id: data['user_id']?.toString() ?? '',
+        username: data['username']?.toString() ?? '',
+        fullName: data['full_name']?.toString() ?? '',
+        email: data['email_masked']?.toString() ?? '',
+        mustChangePassword: true,
+      );
+
+      return AuthResult.success(
+        message: 'Kode valid.',
+        user: user,
+      );
+    } on PostgrestException catch (e) {
+      return AuthResult.failure(e.message);
+    } catch (e) {
+      return AuthResult.failure('Gagal memverifikasi kode: $e');
+    }
+  }
+
+  /// Mengatur password baru menggunakan kode unik 6-digit (Tahap 2 Lupa Password)
+  Future<AuthResult> completeResetPasswordWithCode({
+    required String code,
+    required String newPassword,
+  }) async {
+    final cleanCode = code.trim().toUpperCase();
+    final cleanPassword = newPassword.trim();
+
+    if (cleanCode.isEmpty) {
+      return AuthResult.failure('Kode unik wajib diisi.');
+    }
+    if (cleanPassword.length < 6) {
+      return AuthResult.failure('Password baru minimal 6 karakter.');
+    }
+
+    final client = _client;
+    if (client == null) {
+      return AuthResult.failure('Supabase belum diinisialisasi.');
+    }
+
+    try {
+      await client.rpc(
+        'complete_reset_password_with_code',
+        params: {
+          'input_code': cleanCode,
+          'new_password': cleanPassword,
+        },
+      );
+
+      return AuthResult.success(
+        message:
+            'Password berhasil diperbarui! Silakan masuk dengan password baru Anda.',
+      );
+    } on PostgrestException catch (e) {
+      return AuthResult.failure(e.message);
+    } catch (e) {
+      return AuthResult.failure('Gagal memperbarui password: $e');
     }
   }
 
@@ -405,6 +593,11 @@ class AuthService {
       fullName: fullName,
       isAdmin: isAdmin,
     );
+  }
+
+  /// Delegasi ke UserManagementService untuk menghapus (soft delete) user
+  Future<AuthResult> adminDeleteUser(String userId) async {
+    return UserManagementService().adminDeleteUser(userId);
   }
 
   /// Logout dari Supabase
@@ -432,7 +625,9 @@ class AuthService {
     if (msg.contains('password should be at least')) {
       return 'Kata sandi harus minimal 6 karakter.';
     }
+    if (msg.contains('database error querying schema')) {
+      return 'Terjadi kendala skema database akun di Supabase. Silakan jalankan script SQL migrasi terbaru di Supabase SQL Editor.';
+    }
     return message;
   }
 }
-

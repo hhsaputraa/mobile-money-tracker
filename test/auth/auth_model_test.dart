@@ -9,7 +9,7 @@ void main() {
         'id': 'user-uuid-101',
         'username': 'admin_test',
         'full_name': 'Administrator Test',
-        'email': 'admin@moneytracker.app',
+        'email': 'admin@hhsaputra.my.id',
         'is_admin': true,
         'is_active': 1,
         'last_login_at': '2026-08-20T10:00:00Z',
@@ -20,7 +20,7 @@ void main() {
       expect(user.id, 'user-uuid-101');
       expect(user.username, 'admin_test');
       expect(user.fullName, 'Administrator Test');
-      expect(user.email, 'admin@moneytracker.app');
+      expect(user.email, 'admin@hhsaputra.my.id');
       expect(user.isAdmin, isTrue);
       expect(user.isActive, isTrue);
       expect(user.mustChangePassword, isTrue);
@@ -32,7 +32,7 @@ void main() {
         'id': 'user-uuid-102',
         'username': 'user_changed',
         'full_name': 'User Changed',
-        'email': 'changed@moneytracker.app',
+        'email': 'changed@hhsaputra.my.id',
         'password_changed': true,
       };
 
@@ -40,12 +40,46 @@ void main() {
       expect(user.mustChangePassword, isFalse);
     });
 
+    test('isActive defaults to true when omitted or null in json', () {
+      final json = {
+        'id': 'user-uuid-103',
+        'username': 'user_active_default',
+        'full_name': 'Active Default',
+        'email': 'active@hhsaputra.my.id',
+      };
+
+      final user = UserModel.fromJson(json);
+      expect(user.isActive, isTrue);
+    });
+
+    test('isActive parses false when explicitly false or 0', () {
+      final jsonFalse = {
+        'id': 'user-uuid-104',
+        'username': 'user_inactive',
+        'full_name': 'Inactive User',
+        'email': 'inactive@hhsaputra.my.id',
+        'is_active': false,
+      };
+      final userFalse = UserModel.fromJson(jsonFalse);
+      expect(userFalse.isActive, isFalse);
+
+      final jsonZero = {
+        'id': 'user-uuid-105',
+        'username': 'user_inactive_0',
+        'full_name': 'Inactive Zero',
+        'email': 'inactive0@hhsaputra.my.id',
+        'is_active': 0,
+      };
+      final userZero = UserModel.fromJson(jsonZero);
+      expect(userZero.isActive, isFalse);
+    });
+
     test('toJson serializes correctly', () {
       final user = UserModel(
         id: 'user-uuid-202',
         username: 'user2',
         fullName: 'User Two',
-        email: 'user2@moneytracker.app',
+        email: 'user2@hhsaputra.my.id',
         isAdmin: false,
         isActive: true,
         mustChangePassword: true,
@@ -58,7 +92,6 @@ void main() {
       expect(json['is_admin'], isFalse);
       expect(json['must_change_password'], isTrue);
     });
-
   });
 
   group('AuthResult Tests', () {
@@ -67,7 +100,7 @@ void main() {
         id: 'user-uuid-1',
         username: 'teller1',
         fullName: 'Teller One',
-        email: 'teller@moneytracker.app',
+        email: 'teller@hhsaputra.my.id',
         isAdmin: false,
       );
 
@@ -88,4 +121,3 @@ void main() {
     });
   });
 }
-
